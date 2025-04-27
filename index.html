@@ -384,6 +384,43 @@
         .favorite-btn.favorited .star {
             fill: #FFD600;
         }
+
+        /* New style for search button */
+        .search-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            background-color: #ef4444; /* Red background */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background-color 0.2s, transform 0.1s;
+            margin: 0.5rem auto;
+            cursor: pointer;
+        }
+
+        .search-button:hover {
+            background-color: #dc2626;
+            transform: scale(1.05);
+        }
+
+        .search-button svg {
+            margin-right: 0.5rem;
+            width: 16px;
+            height: 16px;
+        }
+
+        .fallback-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -437,6 +474,35 @@
                     link.rel = 'noopener noreferrer';
                 }
                 return link;
+            }
+            
+            function createSearchButton(teamName, opponent = null) {
+                const container = document.createElement('div');
+                container.className = 'fallback-container';
+                
+                const searchText = document.createElement('div');
+                searchText.className = opponent ? 'no-channels-info' : 'empty-matches';
+                searchText.textContent = opponent 
+                    ? 'Canais não informados' 
+                    : 'Nenhum jogo próximo encontrado';
+                container.appendChild(searchText);
+                
+                const button = document.createElement('a');
+                button.className = 'search-button';
+                button.href = `https://www.google.com/search?q=onde+assistir+${encodeURIComponent(teamName)}${opponent ? '+vs+'+encodeURIComponent(opponent) : ''}`;
+                button.target = '_blank';
+                button.rel = 'noopener noreferrer';
+                
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    Buscar onde assistir
+                `;
+                
+                container.appendChild(button);
+                return container;
             }
             
             function getFavorites() {
@@ -500,17 +566,15 @@
                 matchDetailsContainer.className = 'match-details';
 
                 if (team.error) {
-                    const errorMsg = document.createElement('div');
-                    errorMsg.className = 'error-message';
-                    errorMsg.textContent = `Erro: ${team.error}`;
-                    matchDetailsContainer.appendChild(errorMsg);
+                    // Instead of just showing an error, add a search button
+                    const searchContainer = createSearchButton(team.name);
+                    matchDetailsContainer.appendChild(searchContainer);
                 } else if (team.matches && Array.isArray(team.matches) && team.matches.length > 0) {
                     const match = team.matches[0]; 
                     if (!match || !match.adversary || !match.datetime_brt) {
-                         const emptyMatches = document.createElement('div');
-                         emptyMatches.className = 'empty-matches';
-                         emptyMatches.textContent = 'Próximo jogo indisponível';
-                         matchDetailsContainer.appendChild(emptyMatches);
+                         // Add search button for missing match data
+                         const searchContainer = createSearchButton(team.name);
+                         matchDetailsContainer.appendChild(searchContainer);
                     } else {
                         // Opponent and Date
                         const opponentDateDiv = document.createElement('div');
@@ -557,18 +621,15 @@
                             channelsSection.appendChild(channelsList);
                             matchDetailsContainer.appendChild(channelsSection);
                         } else {
-                             const noChannels = document.createElement('div');
-                             noChannels.className = 'no-channels-info';
-                             noChannels.textContent = 'Canais não informados';
-                             // Append directly to match details if no channels title/list needed
-                             matchDetailsContainer.appendChild(noChannels); 
+                             // Add search button for missing channels with opponent info
+                             const searchContainer = createSearchButton(team.name, match.adversary);
+                             matchDetailsContainer.appendChild(searchContainer);
                         }
                     }
                 } else {
-                    const emptyMatches = document.createElement('div');
-                    emptyMatches.className = 'empty-matches';
-                    emptyMatches.textContent = 'Nenhum jogo próximo encontrado';
-                    matchDetailsContainer.appendChild(emptyMatches);
+                    // Add search button for no matches
+                    const searchContainer = createSearchButton(team.name);
+                    matchDetailsContainer.appendChild(searchContainer);
                 }
 
                 teamItem.appendChild(matchDetailsContainer);
