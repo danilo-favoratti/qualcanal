@@ -3,3 +3,4 @@
 match_results.json
 search_results.json
 .venv
+venv/*
