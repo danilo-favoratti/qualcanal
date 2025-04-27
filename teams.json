@@ -1,0 +1,87 @@
+[
+  {
+    "serie": "Série A",
+    "teams": [
+      {
+        "name": "Atlético-MG",
+        "image": "images/Atletico-MG.png"
+      },
+      {
+        "name": "Bahia",
+        "image": "images/Bahia.png"
+      },
+      {
+        "name": "Botafogo",
+        "image": "images/Botafogo.png"
+      },
+      {
+        "name": "Bragantino",
+        "image": "images/Bragantino.png"
+      },
+      {
+        "name": "Ceará",
+        "image": "images/Ceara.png"
+      },
+      {
+        "name": "Corinthians",
+        "image": "images/Corinthians.png"
+      },
+      {
+        "name": "Cruzeiro",
+        "image": "images/Cruzeiro.png"
+      },
+      {
+        "name": "Flamengo",
+        "image": "images/Flamengo.png"
+      },
+      {
+        "name": "Fluminense",
+        "image": "images/Fluminense.png"
+      },
+      {
+        "name": "Fortaleza",
+        "image": "images/Fortaleza.png"
+      },
+      {
+        "name": "Grêmio",
+        "image": "images/Gremio.png"
+      },
+      {
+        "name": "Internacional",
+        "image": "images/Internacional.png"
+      },
+      {
+        "name": "Juventude",
+        "image": "images/Juventude.png"
+      },
+      {
+        "name": "Mirassol",
+        "image": "images/Mirassol.png"
+      },
+      {
+        "name": "Palmeiras",
+        "image": "images/Palmeiras.png"
+      },
+      {
+        "name": "Santos",
+        "image": "images/Santos.png"
+      },
+      {
+        "name": "São Paulo",
+        "image": "images/SaoPaulo.png"
+      },
+      {
+        "name": "Sport",
+        "image": "images/Sport.png"
+      },
+      {
+        "name": "Vasco",
+        "image": "images/Vasco.png"
+      },
+      {
+        "name": "Vitória",
+        "image": "images/Vitoria.png"
+      }
+    ]
+  }
+]

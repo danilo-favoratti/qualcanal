@@ -1,0 +1,172 @@
+[
+  {
+    "serie": "Série A",
+    "teams": [
+      {
+        "name": "Atlético-MG",
+        "image": "images/Atletico-MG.png"
+      },
+      {
+        "name": "Bahia",
+        "image": "images/Bahia.png"
+      },
+      {
+        "name": "Botafogo",
+        "image": "images/Botafogo.png"
+      },
+      {
+        "name": "Bragantino",
+        "image": "images/Bragantino.png"
+      },
+      {
+        "name": "Ceará",
+        "image": "images/Ceara.png"
+      },
+      {
+        "name": "Corinthians",
+        "image": "images/Corinthians.png"
+      },
+      {
+        "name": "Cruzeiro",
+        "image": "images/Cruzeiro.png"
+      },
+      {
+        "name": "Flamengo",
+        "image": "images/Flamengo.png"
+      },
+      {
+        "name": "Fluminense",
+        "image": "images/Fluminense.png"
+      },
+      {
+        "name": "Fortaleza",
+        "image": "images/Fortaleza.png"
+      },
+      {
+        "name": "Grêmio",
+        "image": "images/Gremio.png"
+      },
+      {
+        "name": "Internacional",
+        "image": "images/Internacional.png"
+      },
+      {
+        "name": "Juventude",
+        "image": "images/Juventude.png"
+      },
+      {
+        "name": "Mirassol",
+        "image": "images/Mirassol.png"
+      },
+      {
+        "name": "Palmeiras",
+        "image": "images/Palmeiras.png"
+      },
+      {
+        "name": "Santos",
+        "image": "images/Santos.png"
+      },
+      {
+        "name": "São Paulo",
+        "image": "images/SaoPaulo.png"
+      },
+      {
+        "name": "Sport",
+        "image": "images/Sport.png"
+      },
+      {
+        "name": "Vasco",
+        "image": "images/Vasco.png"
+      },
+      {
+        "name": "Vitória",
+        "image": "images/Vitoria.png"
+      }
+    ]
+  },
+  {
+    "serie": "Série B",
+    "teams": [
+      {
+        "name": "Athletico-PR",
+        "image": "images/B/AtleticoPR.png"
+      },
+      {
+        "name": "América-MG",
+        "image": "images/B/AmericaMG.png"
+      },
+      {
+        "name": "Amazonas",
+        "image": "images/B/Amazonas.png"
+      },
+      {
+        "name": "Atlético-GO",
+        "image": "images/B/AtleticoGO.png"
+      },
+      {
+        "name": "Athletic Club",
+        "image": "images/B/AtleticClub.png"
+      },
+      {
+        "name": "Avaí",
+        "image": "images/B/Avai.png"
+      },
+      {
+        "name": "Botafogo-SP",
+        "image": "images/B/BotafogoSP.png"
+      },
+      {
+        "name": "Chapecoense",
+        "image": "images/B/Chapecoense.png"
+      },
+      {
+        "name": "CRB",
+        "image": "images/B/crb.png"
+      },
+      {
+        "name": "Criciúma",
+        "image": "images/B/Criciuma.png"
+      },
+      {
+        "name": "Coritiba",
+        "image": "images/B/Coritiba.png"
+      },
+      {
+        "name": "Cuiabá",
+        "image": "images/B/Cuiaba.png"
+      },
+      {
+        "name": "Ferroviária",
+        "image": "images/B/Ferroviaria.png"
+      },
+      {
+        "name": "Goiás",
+        "image": "images/B/Goias.png"
+      },
+      {
+        "name": "Novorizontino",
+        "image": "images/B/Novorizontino.png"
+      },
+      {
+        "name": "Operário-PR",
+        "image": "images/B/OperarioPR.png"
+      },
+      {
+        "name": "Paysandu",
+        "image": "images/B/Paysandu.png"
+      },
+      {
+        "name": "Remo",
+        "image": "images/B/Remo.png"
+      },
+      {
+        "name": "Volta Redonda",
+        "image": "images/B/VoltaRedonda.png"
+      },
+      {
+        "name": "Vila Nova",
+        "image": "images/B/VilaNova.png"
+      }
+    ]
+  }
+]

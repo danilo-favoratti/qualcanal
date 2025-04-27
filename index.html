@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FutStream - Próximos Jogos</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Pixelify+Sans:wght@700&display=swap" rel="stylesheet">
+    
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-16W495B37Y"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-16W495B37Y');
+    </script> 
+    
+    <style>
+        :root {
+            --bg-color: #111827; /* Dark Blue/Grey */
+            --card-bg: #1f2937; /* Slightly Lighter Dark */
+            --text-color: #e5e7eb; /* Light Grey Text */
+            --text-muted: #9ca3af; /* Muted Grey */
+            --accent-color: #22d3ee; /* Electric Blue */
+            --accent-hover: #67e8f9;
+            --border-color: #374151; /* Darker Border */
+            --shadow: rgba(0, 0, 0, 0.2);
+            --logo-size: 56px;
+            --font-pixel: 'Pixelify Sans', sans-serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        main {
+            max-width: 1600px; /* Wider layout */
+            margin: 0 auto;
+        }
+
+        /* Main Grid Layout */
+        .teams-grid {
+            display: grid;
+            /* Responsive grid - more columns on larger screens */
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+            gap: 1.5rem;
+        }
+
+        /* Styling for each team item in the grid */
+        .team-item {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s;
+            position: relative;
+        }
+        .team-item.favorited {
+            background: linear-gradient(135deg, rgba(255,214,0,0.10) 0%, rgba(255,214,0,0.18) 100%);
+            box-shadow: 0 0 0 2px #FFD60044;
+        }
+
+        .team-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 5px 15px var(--shadow);
+            border-color: var(--accent-color);
+        }
+
+        .team-item.favorited:hover {
+            border-color: #FFD600;
+            box-shadow: 0 0 0 2px #FFD60044, 0 5px 15px var(--shadow);
+        }
+
+        .team-item.favorited:hover .team-logo {
+            border-color: #FFD600;
+        }
+
+        .team-item.favorited:hover .team-name {
+            color: #FFD600;
+            text-shadow: 0 2px 12px rgba(255,214,0,0.18);
+        }
+
+        /* Header section within the team item */
+        .team-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.2rem;
+            padding-bottom: 0;
+            /* border-bottom: 1px solid var(--border-color); */
+        }
+
+        .team-logo {
+            width: 132px;
+            height: 132px;
+            object-fit: contain;
+            flex-shrink: 0;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 10px;
+            border: 3px solid var(--accent-color);
+        }
+
+        .team-item.favorited .team-logo {
+            border-color: #FFD600;
+        }
+
+        .team-name {
+            font-family: var(--font-pixel);
+            font-weight: 700;
+            font-size: 2rem;
+            color: var(--accent-color);
+            margin-top: 0.2rem;
+            margin-bottom: 0;
+            padding-bottom: 0;
+            letter-spacing: 1px;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(34,211,238,0.10);
+        }
+        
+        .team-item.favorited .team-name {
+            color: #FFD600;
+            text-shadow: 0 2px 12px rgba(255,214,0,0.18);
+        }
+        
+        /* Match details section */
+        .match-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 0;
+            padding-top: 0;
+        }
+
+        .match-opponent-date {
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 0;
+            padding: 0;
+        }
+        
+        .match-opponent {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-color);
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        
+        .match-datetime {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        
+        .channels-section {
+            /* Container for title and list */
+        }
+
+        .channels-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.8px;
+        }
+
+        .channels-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            justify-content: center; 
+        }
+
+        .channel-link {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4rem 0.9rem; 
+            background-color: var(--border-color); /* Use border color for background */
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: background-color 0.2s, color 0.2s, transform 0.1s ease;
+            white-space: nowrap;
+            border: 1px solid transparent;
+        }
+
+        .channel-link:hover {
+            background-color: var(--accent-color);
+            color: var(--bg-color); /* Dark text on accent hover */
+            transform: scale(1.05);
+        }
+        
+        .no-channels-info,
+        .empty-matches,
+        .error-message {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 1rem 0; 
+            margin-top: auto;
+            font-style: italic;
+            flex-grow: 1; /* Allow to take space */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .error-message {
+             color: #f87171; /* Lighter red for dark theme */
+             font-weight: 500;
+             font-style: normal;
+        }
+
+        /* Loading and Error States */
+        .loading {
+            text-align: center;
+            padding: 5rem 1rem;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 4px solid rgba(255, 255, 255, 0.2); /* Lighter border for dark theme */
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-container {
+            background-color: rgba(239, 68, 68, 0.1); /* Semi-transparent red */
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 3rem auto;
+            max-width: 600px;
+            color: #fecaca; /* Light red text */
+            text-align: center;
+        }
+         .error-container strong {
+             color: #f87171;
+         }
+        .error-container p {
+            margin-bottom: 0.75rem;
+            color: var(--text-color);
+        }
+         .error-container p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Footer Timestamp Styling */
+        .footer-timestamp {
+            text-align: center;
+            margin-top: 4rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .updated-at {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        .footer-link {
+            color: var(--accent-color);
+            font-size: 1rem;
+            text-decoration: none;
+            margin-top: 0.5rem;
+            display: inline-block;
+            transition: color 0.2s;
+        }
+        .footer-link:hover {
+            color: var(--accent-hover);
+        }
+
+        .footer-help {
+            display: none;
+        }
+
+        .list-continuation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 3rem 0 0 0;
+            padding: 2.5rem 0 0 0;
+            font-size: 2.1rem;
+            font-weight: 900;
+            color: #FFD600;
+            text-align: center;
+            line-height: 1.1;
+        }
+        .list-continuation-link {
+            color: #FFD600;
+            text-decoration: underline;
+            font-size: 2.1rem;
+            font-weight: 900;
+            margin-left: 0.4em;
+            transition: color 0.2s;
+        }
+        .list-continuation-link:hover {
+            color: #ffea80;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+             body { padding: 1rem; }
+             .teams-grid {
+                 grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+             }
+             .team-item { padding: 1rem; }
+             .team-name { font-size: 1.5rem; }
+             .match-opponent { font-size: 1rem; }
+             .match-datetime { font-size: 0.85rem; }
+        }
+
+        @media (max-width: 480px) {
+            .teams-grid {
+                grid-template-columns: 1fr; /* Single column */
+            }
+            .team-header { flex-direction: column; text-align: center; } /* Stack logo and name */
+            .team-name { margin-top: 0.5rem; }
+        }
+
+        .favorite-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            z-index: 2;
+            padding: 0;
+            margin: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .favorite-btn svg {
+            width: 28px;
+            height: 28px;
+            display: block;
+        }
+        .favorite-btn .star {
+            stroke: #FFD600;
+            stroke-width: 2px;
+            fill: none;
+            transition: fill 0.2s;
+        }
+        .favorite-btn.favorited .star {
+            fill: #FFD600;
+        }
+    </style>
+</head>
+<body>
+
+    <main id="app">
+        <div class="loading">
+             <div class="spinner"></div>
+             <span>Carregando Jogos...</span>
+        </div>
+        <!-- Grid will be populated here -->
+    </main>
+
+    <div class="footer-timestamp">
+        <p class="updated-at" id="updated-at">Atualizando...</p> 
+        <a class="footer-link" href="https://favoratti.com" target="_blank" rel="noopener">favoratti.com</a>
+        <!-- List continuation link will be injected here by JS -->
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = document.getElementById('app');
+            const updatedAtElement = document.getElementById('updated-at');
+
+            // --- Helper Functions ---
+            function formatDate(dateString) {
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date)) { throw new Error('Invalid date'); }
+                    const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    const weekday = weekdays[date.getDay()];
+                    const day = date.getDate();
+                    const month = months[date.getMonth()];
+                    const hours = date.getHours();
+                    const minutes = date.getMinutes().toString().padStart(2, '0');
+                    return `${weekday} - ${day}/${month} - ${hours}:${minutes}h`;
+                } catch (e) {
+                    console.error(`Error formatting date: ${dateString}`, e);
+                    return dateString || 'Data inválida';
+                }
+            }
+
+            function createChannelLink(channel) {
+                 if (!channel || !channel.name) return null; 
+                const link = document.createElement('a');
+                link.className = 'channel-link';
+                link.textContent = channel.name;
+                link.href = channel.url || '#';
+                if (channel.url && channel.url !== '#') { // Only add target blank for valid URLs
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                }
+                return link;
+            }
+            
+            function getFavorites() {
+                try {
+                    return JSON.parse(localStorage.getItem('futstream_favorites') || '[]');
+                } catch { return []; }
+            }
+            function setFavorites(favs) {
+                localStorage.setItem('futstream_favorites', JSON.stringify(favs));
+            }
+
+            // --- Create Team Item Function (New Structure) ---
+            function createTeamItem(team, isFavorited, onToggleFavorite) { 
+                 if (!team || !team.name) {
+                     console.warn('Skipping invalid team object:', team);
+                     return null; 
+                 }
+                
+                const teamItem = document.createElement('div');
+                teamItem.className = 'team-item' + (isFavorited ? ' favorited' : '');
+
+                // Favorite Button
+                const favBtn = document.createElement('button');
+                favBtn.className = 'favorite-btn' + (isFavorited ? ' favorited' : '');
+                favBtn.title = isFavorited ? 'Remover dos favoritos' : 'Favoritar';
+                favBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <polygon class="star" points="12,3 15,9.5 22,10 17,14.5 18.5,21 12,17.5 5.5,21 7,14.5 2,10 9,9.5" />
+                    </svg>
+                `;
+                favBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onToggleFavorite(team.name);
+                };
+                teamItem.appendChild(favBtn);
+
+                // Team Header
+                const teamHeader = document.createElement('div');
+                teamHeader.className = 'team-header';
+                
+                const teamLogo = document.createElement('img');
+                teamLogo.className = 'team-logo';
+                teamLogo.src = team.image || 'images/default.png'; 
+                teamLogo.alt = `${team.name} Logo`;
+                teamLogo.onerror = function() { 
+                    this.onerror = null; 
+                    this.src = 'images/default.png'; 
+                };
+
+                const teamNameElement = document.createElement('h2');
+                teamNameElement.className = 'team-name';
+                teamNameElement.textContent = team.name;
+
+                teamHeader.appendChild(teamLogo);
+                teamHeader.appendChild(teamNameElement);
+                teamItem.appendChild(teamHeader);
+
+                // Match Details Container
+                const matchDetailsContainer = document.createElement('div');
+                matchDetailsContainer.className = 'match-details';
+
+                if (team.error) {
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'error-message';
+                    errorMsg.textContent = `Erro: ${team.error}`;
+                    matchDetailsContainer.appendChild(errorMsg);
+                } else if (team.matches && Array.isArray(team.matches) && team.matches.length > 0) {
+                    const match = team.matches[0]; 
+                    if (!match || !match.adversary || !match.datetime_brt) {
+                         const emptyMatches = document.createElement('div');
+                         emptyMatches.className = 'empty-matches';
+                         emptyMatches.textContent = 'Próximo jogo indisponível';
+                         matchDetailsContainer.appendChild(emptyMatches);
+                    } else {
+                        // Opponent and Date
+                        const opponentDateDiv = document.createElement('div');
+                        opponentDateDiv.className = 'match-opponent-date';
+                        
+                        const matchOpponent = document.createElement('div');
+                        matchOpponent.className = 'match-opponent';
+                        matchOpponent.textContent = `vs ${match.adversary}`;
+
+                        const matchDatetime = document.createElement('div');
+                        matchDatetime.className = 'match-datetime';
+                        matchDatetime.textContent = formatDate(match.datetime_brt);
+                        
+                        opponentDateDiv.appendChild(matchOpponent);
+                        opponentDateDiv.appendChild(matchDatetime);
+                        matchDetailsContainer.appendChild(opponentDateDiv);
+
+                        // Channels Section
+                        const channelsSection = document.createElement('div');
+                        channelsSection.className = 'channels-section';
+
+                        const channelsList = document.createElement('div');
+                        channelsList.className = 'channels-list';
+                        
+                        let hasChannels = false;
+                        if (match.channels && Array.isArray(match.channels) && match.channels.length > 0) {
+                            const seenChannelNames = new Set();
+                            match.channels.forEach(channel => {
+                                if (channel && channel.name) {
+                                    const lowerCaseName = channel.name.toLowerCase();
+                                    if (!seenChannelNames.has(lowerCaseName)) {
+                                        const link = createChannelLink(channel);
+                                        if(link) {
+                                            channelsList.appendChild(link);
+                                            seenChannelNames.add(lowerCaseName);
+                                            hasChannels = true;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        
+                        if(hasChannels) {
+                            channelsSection.appendChild(channelsList);
+                            matchDetailsContainer.appendChild(channelsSection);
+                        } else {
+                             const noChannels = document.createElement('div');
+                             noChannels.className = 'no-channels-info';
+                             noChannels.textContent = 'Canais não informados';
+                             // Append directly to match details if no channels title/list needed
+                             matchDetailsContainer.appendChild(noChannels); 
+                        }
+                    }
+                } else {
+                    const emptyMatches = document.createElement('div');
+                    emptyMatches.className = 'empty-matches';
+                    emptyMatches.textContent = 'Nenhum jogo próximo encontrado';
+                    matchDetailsContainer.appendChild(emptyMatches);
+                }
+
+                teamItem.appendChild(matchDetailsContainer);
+                return teamItem;
+            }
+
+            // --- Fetch and Render Logic ---
+            function renderData(data) {
+                 updatedAtElement.textContent = `Atualizado em: ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
+                 app.innerHTML = ''; 
+                 
+                 if (!data || !data.series || !Array.isArray(data.series)) { // Allow empty series array
+                     throw new Error('Formato de dados inválido');
+                 }
+
+                 let allTeams = [];
+                 data.series.forEach(series => {
+                     if (series && series.teams && Array.isArray(series.teams)) {
+                         allTeams = allTeams.concat(series.teams);
+                     }
+                 });
+
+                 if (allTeams.length === 0) {
+                    app.innerHTML = '<p class="empty-matches">Nenhuma equipe encontrada para exibir.</p>';
+                    return;
+                 }
+
+                 // FAVORITES
+                 let favorites = getFavorites();
+                 // Sort: favorites first, then alphabetically
+                 allTeams.sort((a, b) => {
+                     const aFav = favorites.includes(a.name);
+                     const bFav = favorites.includes(b.name);
+                     if (aFav && !bFav) return -1;
+                     if (!aFav && bFav) return 1;
+                     return (a?.name || '').localeCompare(b?.name || '');
+                 });
+
+                 const teamsGrid = document.createElement('div');
+                 teamsGrid.className = 'teams-grid';
+
+                 function handleToggleFavorite(teamName) {
+                     let favs = getFavorites();
+                     if (favs.includes(teamName)) {
+                         favs = favs.filter(f => f !== teamName);
+                     } else {
+                         favs.push(teamName);
+                     }
+                     setFavorites(favs);
+                     renderData(data); // re-render
+                 }
+
+                 allTeams.forEach(team => {
+                     const isFav = favorites.includes(team.name);
+                     const teamItemElement = createTeamItem(team, isFav, handleToggleFavorite);
+                     if (teamItemElement) {
+                         teamsGrid.appendChild(teamItemElement);
+                     }
+                 });
+                 
+                 app.appendChild(teamsGrid); 
+
+                 // After rendering the grid, add the list continuation link
+                 const continuation = document.createElement('div');
+                 continuation.className = 'list-continuation';
+                 continuation.innerHTML = `Não encontrou seu time? <a class="list-continuation-link" href="https://favoratti.com/onde-assistir/" target="_blank" rel="noopener">Clique aqui</a>`;
+                 app.appendChild(continuation);
+            }
+
+            // Initial Fetch
+            fetch('match_results.json?cacheBust=' + new Date().getTime()) 
+                .then(response => {
+                    if (!response.ok) {
+                        // Try to get more specific error text if possible
+                        return response.text().then(text => { 
+                            throw new Error(`Falha ao carregar (${response.status}): ${response.statusText} - ${text.substring(0, 100)}`); 
+                        });
+                    }
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        return response.json();
+                    } else {
+                         throw new Error("Resposta inválida do servidor (não é JSON)");
+                    }
+                })
+                .then(data => {
+                    renderData(data);
+                })
+                .catch(error => {
+                    console.error('Erro detalhado:', error);
+                    app.innerHTML = `
+                        <div class="error-container">
+                            <p><strong>Falha ao Carregar Dados</strong></p>
+                            <p>Não foi possível obter as informações dos jogos.</p>
+                            <p><small>Detalhes: ${error.message}</small></p>
+                            <p><small>Verifique o arquivo 'match_results.json' e a conexão.</small></p>
+                        </div>
+                    `;
+                    updatedAtElement.textContent = 'Falha na atualização'; 
+                });
+        });
+    </script>
+</body>
+</html>
