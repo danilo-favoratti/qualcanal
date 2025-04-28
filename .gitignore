@@ -4,3 +4,7 @@ match_results.json
 search_results.json
 .venv
 venv/*
+calendar_results.json
+next_matches.json
+watch_results.json
+watch_error*

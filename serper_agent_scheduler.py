@@ -2,13 +2,13 @@
 
 import os
 import requests
-import schedule
 import time
 import json
 import concurrent.futures
 from datetime import datetime
 import pytz
 from agents import Agent, Runner, WebSearchTool
+import http.client
 
 from dotenv import load_dotenv
 
@@ -17,7 +17,7 @@ load_dotenv()
 
 # --- Direct Serper API Functions ---
 
-def search_serper_api(query, location="Brazil", gl="br", hl="pt-br", tbs="qdr:d", engine="google"):
+def search_serper_api(query, location="Brazil", gl="br", hl="pt-br", tbs="", engine="google"):
     """
     Performs a direct search query to the Google Serper API without going through the agent.
     """
@@ -35,9 +35,11 @@ def search_serper_api(query, location="Brazil", gl="br", hl="pt-br", tbs="qdr:d"
         "location": location,
         "gl": gl,
         "hl": hl,
-        "tbs": tbs,
         "engine": engine,
     }
+
+    if tbs != "":
+        payload["tbs"] = tbs
 
     try:
         response = requests.post(search_url, headers=headers, json=payload)
@@ -49,22 +51,40 @@ def search_serper_api(query, location="Brazil", gl="br", hl="pt-br", tbs="qdr:d"
         return {"error": f"An unexpected error occurred: {e}"}
 
 
-def search_for_team(team_name):
+def search_for_team_calendar(team_name):
     """
-    Search for matches for a specific team and return the results.
+    Search for the match calendar of a specific team and return the results.
     """
-    query = f"onde assistir próximo jogo {team_name}"
+    query = f"calendario oficial de partidas do {team_name}"
     
-    print(f"Searching for: {team_name}\n")
+    print(f"Searching calendar for: {team_name}\n")
     result = search_serper_api(query)
     
     # Check if the search was successful
     if "error" in result:
-        print(f"Error searching for {team_name}: {result['error']}")
+        print(f"Error searching calendar for {team_name}: {result['error']}")
         return {"team": team_name, "error": result["error"], "data": None}
         
-    print(f"Found results for {team_name}")
+    print(f"Found calendar results for {team_name}")
     return {"team": team_name, "error": None, "data": result}
+
+
+def search_where_to_watch(team1, team2):
+    """
+    Search for where to watch the match between two teams.
+    """
+    query = f"onde assistir {team1} x {team2}"
+    
+    print(f"Searching where to watch: {team1} vs {team2}\n")
+    result = search_serper_api(query, tbs="qdr:w")
+    
+    # Check if the search was successful
+    if "error" in result:
+        print(f"Error searching where to watch {team1} vs {team2}: {result['error']}")
+        return {"team1": team1, "team2": team2, "error": result["error"], "data": None}
+        
+    print(f"Found viewing options for {team1} vs {team2}")
+    return {"team1": team1, "team2": team2, "error": None, "data": result}
 
 
 # --- Agent Setup ---
@@ -86,9 +106,8 @@ def setup_agent():
         Your task is to extract information about future matches for each team, identify where they can be watched,
         and format the results into a structured JSON.
         """,
-        tools=[
-            WebSearchTool()
-        ]
+        model="gpt-4o",
+        #tools=[WebSearchTool()]
     )
     
     return agent
@@ -148,19 +167,224 @@ def extract_json_from_response(text):
     return None
 
 
-# --- Main Task Function ---
+# --- First Step: Find Next Matches ---
 
-def fetch_and_process_all_teams_matches():
+def scrape_url(url):
     """
-    Performs parallel searches for all teams and then processes the results individually with an agent.
+    Scrape a URL via Serper scrape API.
     """
-    # Use fixed filenames instead of timestamped ones
-    raw_results_file = 'search_results.json'
-    output_file = 'match_results.json'
+    conn = http.client.HTTPSConnection("scrape.serper.dev")
+    payload = json.dumps({"url": url})
+    headers = {
+        "X-API-KEY": os.getenv("SERPER_API_KEY"),
+        "Content-Type": "application/json"
+    }
+    conn.request("POST", "/", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+    try:
+        return json.loads(data.decode("utf-8"))
+    except:
+        return {}
+
+
+def find_next_matches():
+    """
+    First step: For each team, search for their match calendar and
+    extract the next upcoming match using an agent.
+    Returns a dictionary of team names and their next opponent.
+    """
+    # Use fixed filenames
+    calendar_results_file = 'calendar_results.json'
+    next_matches_file = 'next_matches.json'
     
-    print(f"Starting team search task at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"Starting calendar search task at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
     # Load teams data
+    try:
+        with open('teams.json', 'r', encoding='utf-8') as f:
+            series_data = json.load(f)
+    except FileNotFoundError:
+        print("Error: teams.json not found.")
+        return {}
+    except json.JSONDecodeError:
+        print("Error: Could not decode JSON from teams.json.")
+        return {}
+
+    # Extract all teams with their series and image
+    teams_with_series = []
+    for series in series_data:
+        series_name = series.get('serie', 'Unknown')
+        for team_obj in series.get('teams', []):
+            if isinstance(team_obj, dict):
+                teams_with_series.append({"team": team_obj, "serie": series_name})
+            else:
+                teams_with_series.append({"team": {"name": team_obj, "image": None}, "serie": series_name})
+
+    if not teams_with_series:
+        print("No teams found in teams.json.")
+        return {}
+
+    print(f"Found {len(teams_with_series)} teams. Starting parallel calendar searches...")
+
+    # Setup the agent once
+    agent = setup_agent()
+    
+    # Dictionary to store next matches for each team
+    next_matches = {}
+    # Store raw results for debugging
+    all_calendar_results = []
+
+    brasilia_tz = pytz.timezone('America/Sao_Paulo')
+    current_datetime_brt = datetime.now(brasilia_tz).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    # --- Perform parallel searches for calendars ---    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        # Submit all search tasks
+        future_to_team = {
+            executor.submit(search_for_team_calendar, team_info["team"]["name"]): team_info 
+            for team_info in teams_with_series
+        }
+        
+        # Process results as they complete
+        for future in concurrent.futures.as_completed(future_to_team):
+            team_info = future_to_team[future]
+            team_name = team_info["team"]["name"]
+            
+            try:
+                search_result = future.result()
+                all_calendar_results.append(search_result)
+                
+                # Check if search failed
+                if search_result.get("error"):
+                    print(f"Skipping agent processing for {team_name} due to search error: {search_result['error']}")
+                    continue
+
+                # --- Agent Processing for calendar data --- 
+                print(f"Processing calendar results for {team_name} with agent...")
+                
+                # Prepare the prompt for the agent
+                organic = search_result["data"].get("organic", [])
+                links = [item.get("link") for item in organic]
+                # Scrape first 3 calendar URLs in parallel
+                scraped_calendar_list = []
+                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as scrape_executor:
+                    futures = {scrape_executor.submit(scrape_url, url): url for url in links[:3]}
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            scraped_calendar_list.append(future.result())
+                        except:
+                            continue
+
+                calendar_prompt = f'''## TASK: EXTRACT NEXT MATCH FOR {team_name}
+
+You have been given links for the team calendar of: {team_name}.
+Your job is to:
+1. Find the next upcoming match for {team_name} starting from today (Brasilia Time).
+2. Get the team name of the opponent (do not use 3 letters, like NAU or FLU. Use the full team name). Also "Ida" or "Vida" or "Vidal" is not a team. Ignore them and search others.
+3. Extract details for only that single next match: opponent team and date/time in ISO8601 format.
+4. Format the result into a structured JSON.
+
+## CURRENT DATETIME (Brasilia Time)
+{current_datetime_brt}
+
+## SEARCH RESULTS FOR {team_name} CALENDAR
+```json
+{json.dumps(scraped_calendar_list, ensure_ascii=False)}
+```
+
+## EXPECTED OUTPUT FORMAT
+```json
+{{
+  "next_match": {{
+    "opponent": "<Opponent Team Name>",
+    "datetime_brt": "<ISO8601 DateTime in Brasilia TimeZone>"
+  }}
+}}
+```
+
+IMPORTANT INSTRUCTIONS:
+- Only include the very next match after yesterday.
+- Ensure datetime_brt is in ISO8601 format with Brasilia timezone (-03:00)
+- If no future matches are found, return `{{"next_match": null}}`
+- Only include the JSON object in your response, no additional text.
+- Do not consider any result related to junior soccer or feminine soccer. Just masculine adult soccer.
+
+Please provide the structured JSON with the next match for {team_name}:'''
+
+                try:
+                    # Run the agent with the calendar data
+                    agent_result = Runner.run_sync(agent, calendar_prompt)
+                    
+                    if agent_result.final_output:
+                        parsed_match_json = extract_json_from_response(agent_result.final_output)
+                        
+                        if parsed_match_json and isinstance(parsed_match_json, dict) and "next_match" in parsed_match_json:
+                            if parsed_match_json["next_match"]:
+                                opponent = parsed_match_json["next_match"].get("opponent")
+                                datetime_brt = parsed_match_json["next_match"].get("datetime_brt")
+                                
+                                # Store the next match info
+                                next_matches[team_name] = {
+                                    "opponent": opponent,
+                                    "datetime_brt": datetime_brt
+                                }
+                                print(f"Next match for {team_name}: vs {opponent} at {datetime_brt}")
+                            else:
+                                print(f"No upcoming matches found for {team_name}")
+                                next_matches[team_name] = None
+                        else:
+                            print(f"Failed to extract valid JSON from agent response for {team_name}.")
+                            with open(f"calendar_error_{team_name}.txt", 'w', encoding='utf-8') as f_err:
+                                f_err.write(agent_result.final_output or "No agent output.")
+                    else:
+                        print(f"No output received from the agent for {team_name}.")
+                        
+                except Exception as agent_e:
+                    print(f"Error during agent processing for {team_name}: {agent_e}")
+
+            except Exception as search_e:
+                print(f"Error processing calendar search for {team_name}: {search_e}")
+    
+    print(f"Completed all calendar searches and agent processing.")
+    
+    # Save the next matches results
+    try:
+        with open(next_matches_file, 'w', encoding='utf-8') as f:
+            json.dump(next_matches, f, indent=2, ensure_ascii=False)
+        print(f"Next matches data saved to {next_matches_file}")
+    except Exception as e:
+        print(f"Error saving next matches data: {e}")
+        
+    # Optional: Save raw calendar results
+    try:
+        with open(calendar_results_file, 'w', encoding='utf-8') as f:
+            json.dump(all_calendar_results, f, indent=2, ensure_ascii=False)
+        print(f"Raw calendar results saved to {calendar_results_file}")
+    except Exception as e:
+        print(f"Error saving raw calendar results: {e}")
+        
+    return next_matches
+
+
+# --- Second Step: Find Where to Watch ---
+
+def find_where_to_watch(next_matches):
+    """
+    Second step: For each team with a next match, search for where to watch the game
+    and process the results with an agent.
+    """
+    if not next_matches:
+        print("No next matches found. Skipping 'where to watch' search.")
+        return {}
+        
+    # Use fixed filenames
+    watch_results_file = 'watch_results.json'
+    output_file = 'match_results.json'
+    
+    print(f"Starting 'where to watch' search task at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+
+    # Load teams data for reference
     try:
         with open('teams.json', 'r', encoding='utf-8') as f:
             series_data = json.load(f)
@@ -171,166 +395,223 @@ def fetch_and_process_all_teams_matches():
         print("Error: Could not decode JSON from teams.json.")
         return
 
-    # Extract all teams with their series and image
-    teams_with_series = []
+    # Create a lookup for teams with their series and image
+    teams_lookup = {}
     for series in series_data:
         series_name = series.get('serie', 'Unknown')
         for team_obj in series.get('teams', []):
             if isinstance(team_obj, dict):
-                teams_with_series.append({"team": team_obj, "serie": series_name})
-            else: # Handle old format if necessary, though teams.json should be updated
-                teams_with_series.append({"team": {"name": team_obj, "image": None}, "serie": series_name})
+                teams_lookup[team_obj.get("name")] = {"image": team_obj.get("image"), "serie": series_name}
+            else:
+                teams_lookup[team_obj] = {"image": None, "serie": series_name}
 
-    if not teams_with_series:
-        print("No teams found in teams.json.")
-        return
-
-    print(f"Found {len(teams_with_series)} teams. Starting parallel searches...")
-
-    # Setup the agent once
+    # Setup the agent
     agent = setup_agent()
     
     # Dictionary to store processed results, organized by series
     processed_data_by_series = {series.get('serie'): [] for series in series_data}
-    # Store raw results temporarily if needed for debugging (optional)
-    all_search_results_for_debug = [] 
+    # Store raw results for debugging
+    all_watch_results = []
 
     brasilia_tz = pytz.timezone('America/Sao_Paulo')
     current_datetime_brt = datetime.now(brasilia_tz).strftime("%Y-%m-%dT%H:%M:%S%z")
 
-    # --- Perform parallel searches and process results individually ---    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # Create a list of team pairs to search for
+    team_pairs = []
+    for team_name, match_info in next_matches.items():
+        if match_info and match_info.get("opponent"):
+            team_pairs.append({
+                "team1": team_name,
+                "team2": match_info.get("opponent"),
+                "datetime_brt": match_info.get("datetime_brt")
+            })
+
+    print(f"Found {len(team_pairs)} team pairs to search for viewing options.")
+
+    # --- Perform parallel searches for where to watch ---    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         # Submit all search tasks
-        future_to_team = {
-            executor.submit(search_for_team, team_info["team"]["name"]):
-            # Pass only the name to search_for_team
-            team_info 
-            for team_info in teams_with_series
+        future_to_pair = {
+            executor.submit(search_where_to_watch, pair["team1"], pair["team2"]): pair
+            for pair in team_pairs
         }
         
         # Process results as they complete
-        for future in concurrent.futures.as_completed(future_to_team):
-            team_info = future_to_team[future]
-            team_name = team_info["team"]["name"]
-            team_image = team_info["team"].get("image") # Get image path
-            series_name = team_info["serie"]
+        for future in concurrent.futures.as_completed(future_to_pair):
+            pair_info = future_to_pair[future]
+            team1 = pair_info["team1"]
+            team2 = pair_info["team2"]
+            datetime_brt = pair_info["datetime_brt"]
+            series_name = teams_lookup.get(team1, {}).get("serie", "Unknown")
             
             try:
                 search_result = future.result()
-                all_search_results_for_debug.append(search_result) # Optional: store raw result
+                all_watch_results.append(search_result)
                 
                 # Check if search failed
                 if search_result.get("error"):
-                    print(f"Skipping agent processing for {team_name} due to search error: {search_result['error']}")
-                    # Optionally add a placeholder to the final results
+                    print(f"Skipping agent processing for {team1} vs {team2} due to search error: {search_result['error']}")
+                    # Add placeholder with partial info
                     processed_data_by_series[series_name].append({
-                        "name": team_name,
-                        "image": team_image,
-                        "matches": [],
+                        "name": team1,
+                        "image": teams_lookup.get(team1, {}).get("image"),
+                        "matches": [{
+                            "adversary": team2,
+                            "datetime_brt": datetime_brt,
+                            "channels": []
+                        }],
                         "error": f"Search failed: {search_result['error']}"
                     })
                     continue
 
-                # --- Agent Processing for this team --- 
-                print(f"Processing search results for {team_name} with agent...")
+                # --- Agent Processing for viewing options --- 
+                print(f"Processing viewing options for {team1} vs {team2} with agent...")
                 
-                # Prepare the prompt for the agent for a SINGLE team's data
-                single_team_prompt = f'''## TASK: PARSE FOOTBALL MATCH DATA FOR A SINGLE TEAM - NEXT GAME ONLY
+                # Prepare the prompt for the agent
+                organic = search_result["data"].get("organic", [])
+                links = [item.get("link") for item in organic]
+                # Scrape first 3 viewing URLs in parallel
+                scraped_viewing_list = []
+                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as scrape_executor:
+                    futures = {scrape_executor.submit(scrape_url, url): url for url in links[:3]}
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            scraped_viewing_list.append(future.result())
+                        except:
+                            continue
 
-You have been given search results for the team: {team_name}.
+                watch_prompt = f'''## TASK: EXTRACT VIEWING OPTIONS FOR FOOTBALL MATCH
+
+You have been given search results for viewing options for a match between:
+- Team 1: {team1}
+- Team 2: {team2}
+- Date/Time (BRT): {datetime_brt}
+
 Your job is to:
-1. Parse these results to find **all upcoming matches** for {team_name}.
-2. Identify the **chronologically closest future match**.
-3. Extract details for **only that single next match**: opponent team, date/time (ISO8601 Brasilia), and viewing channels.
-4. Format the result into a structured JSON containing **at most one match**.
+1. Parse these results to find all TV channels and streaming services where this match can be watched.
+2. Format the result into a structured JSON.
+3. Remove youtube channels. Remove GE channels.
+4. Remove comments only channels.
+5. Remove narration only channels.
 
-## CURRENT DATETIME (Brasilia Time)
-{current_datetime_brt}
-
-## SEARCH RESULTS FOR {team_name}
+## SEARCH RESULTS FOR VIEWING OPTIONS
 ```json
-{json.dumps(search_result["data"]["organic"], ensure_ascii=False)}
+{json.dumps(scraped_viewing_list, ensure_ascii=False)}
 ```
 
 ## EXPECTED OUTPUT FORMAT
-
-The output should be a JSON object. The "matches" array should contain **zero or one** match object (only the very next future game).
 ```json
 {{
-  "matches": [
-    {{
-      "adversary": "<Opponent Team>",
-      "datetime_brt": "<ISO8601 DateTime Brasilia TimeZone>",
-      "channels": [
-        {{"name": "<Channel Name>", "url": "<Channel URL>"}}
-      ]
-    }}
+  "channels": [
+    {{"name": "<Channel Name>", "url": "<Channel URL or null if not available>"}},
+    {{"name": "<Channel Name>", "url": "<Channel URL or null if not available>"}}
   ]
 }}
 ```
 
 IMPORTANT INSTRUCTIONS:
-- Find all future matches first, then select ONLY the one happening soonest.
-- If multiple games are on the same closest date, pick one arbitrarily.
-- Ensure datetime_brt is in ISO8601 format with Brasilia timezone (-03:00).
-- Remove any duplicate channels for the selected match.
-- If no future matches are found, return an empty "matches" list: `{{"matches": []}}`.
-- Only include the JSON object (starting with {{ and ending with }}) in your response, no additional text or explanations.
+- Include both TV channels and streaming services
+- Remove any duplicate channels
+- If no viewing options are found, return `{{"channels": []}}`
+- For TV channels without URLs, use `null` for the URL field
+- Only include the JSON object in your response, no additional text
 
-Please provide the structured JSON containing only the next future match for {team_name}:'''
+Please provide the structured JSON with viewing options for {team1} vs {team2}:'''
 
                 try:
-                    # Run the agent with the single team data
-                    agent_result = Runner.run_sync(agent, single_team_prompt)
+                    # Run the agent with the viewing options data
+                    agent_result = Runner.run_sync(agent, watch_prompt)
                     
                     if agent_result.final_output:
-                        parsed_team_json = extract_json_from_response(agent_result.final_output)
+                        parsed_channels_json = extract_json_from_response(agent_result.final_output)
                         
-                        if parsed_team_json and isinstance(parsed_team_json, dict) and "matches" in parsed_team_json:
-                            # Successfully parsed matches, add team name and image
-                            team_output = {
-                                "name": team_name,
-                                "image": team_image,
-                                "matches": parsed_team_json["matches"]
+                        if parsed_channels_json and isinstance(parsed_channels_json, dict) and "channels" in parsed_channels_json:
+                            # Successfully parsed channels
+                            match_output = {
+                                "name": team1,
+                                "image": teams_lookup.get(team1, {}).get("image"),
+                                "matches": [{
+                                    "adversary": team2,
+                                    "datetime_brt": datetime_brt,
+                                    "channels": parsed_channels_json["channels"]
+                                }]
                             }
-                            processed_data_by_series[series_name].append(team_output)
-                            print(f"Successfully processed agent results for {team_name}")
+                            processed_data_by_series[series_name].append(match_output)
+                            print(f"Successfully processed viewing options for {team1} vs {team2}")
                         else:
-                            print(f"Failed to extract valid JSON 'matches' from agent response for {team_name}.")
-                            # Add placeholder if agent failed
+                            print(f"Failed to extract valid JSON from agent response for {team1} vs {team2}.")
+                            # Add placeholder with partial info
                             processed_data_by_series[series_name].append({
-                                "name": team_name,
-                                "image": team_image,
-                                "matches": [],
-                                "error": "Agent failed to return valid match JSON"
+                                "name": team1,
+                                "image": teams_lookup.get(team1, {}).get("image"),
+                                "matches": [{
+                                    "adversary": team2,
+                                    "datetime_brt": datetime_brt,
+                                    "channels": []
+                                }],
+                                "error": "Agent failed to return valid channels JSON"
                             })
-                            # Optional: Save raw agent output for this team
-                            with open(f"agent_error_{team_name}.txt", 'w', encoding='utf-8') as f_err:
-                                 f_err.write(agent_result.final_output or "No agent output.")
+                            with open(f"watch_error_{team1}_vs_{team2}.txt", 'w', encoding='utf-8') as f_err:
+                                f_err.write(agent_result.final_output or "No agent output.")
                     else:
-                        print(f"No output received from the agent for {team_name}.")
-                        processed_data_by_series[series_name].append({"name": team_name, "image": team_image, "matches": [], "error": "No agent output"})
+                        print(f"No output received from the agent for {team1} vs {team2}.")
+                        processed_data_by_series[series_name].append({
+                            "name": team1,
+                            "image": teams_lookup.get(team1, {}).get("image"),
+                            "matches": [{
+                                "adversary": team2,
+                                "datetime_brt": datetime_brt,
+                                "channels": []
+                            }],
+                            "error": "No agent output"
+                        })
                         
                 except Exception as agent_e:
-                    print(f"Error during agent processing for {team_name}: {agent_e}")
-                    processed_data_by_series[series_name].append({"name": team_name, "image": team_image, "matches": [], "error": f"Agent processing exception: {agent_e}"})
+                    print(f"Error during agent processing for {team1} vs {team2}: {agent_e}")
+                    processed_data_by_series[series_name].append({
+                        "name": team1,
+                        "image": teams_lookup.get(team1, {}).get("image"),
+                        "matches": [{
+                            "adversary": team2,
+                            "datetime_brt": datetime_brt,
+                            "channels": []
+                        }],
+                        "error": f"Agent processing exception: {agent_e}"
+                    })
 
             except Exception as search_e:
-                print(f"Error processing search future for {team_info.get('team', {}).get('name', 'Unknown Team')}: {search_e}")
-                # Add placeholder if search future itself failed
-                processed_data_by_series[team_info["serie"]].append({
-                    "name": team_info.get('team', {}).get('name', 'Unknown Team'),
-                    "image": team_info.get('team', {}).get('image'),
-                    "matches": [],
+                print(f"Error processing search for {team1} vs {team2}: {search_e}")
+                processed_data_by_series[series_name].append({
+                    "name": team1,
+                    "image": teams_lookup.get(team1, {}).get("image"),
+                    "matches": [{
+                        "adversary": team2,
+                        "datetime_brt": datetime_brt,
+                        "channels": []
+                    }],
                     "error": f"Search future failed: {search_e}"
                 })
     
-    print(f"Completed all searches and agent processing.")
+    print(f"Completed all 'where to watch' searches and agent processing.")
+    
+    # --- Add teams without matches ---
+    for series_name, series_info in processed_data_by_series.items():
+        team_names_with_matches = [team_info["name"] for team_info in series_info]
+        
+        for team_name, team_data in teams_lookup.items():
+            if team_data.get("serie") == series_name and team_name not in team_names_with_matches:
+                # Add team with empty matches
+                processed_data_by_series[series_name].append({
+                    "name": team_name,
+                    "image": team_data.get("image"),
+                    "matches": []
+                })
     
     # --- Combine results into final structure --- 
     final_processed_data = {"series": []}
     for series_name, teams in processed_data_by_series.items():
-        final_processed_data["series"].append({"name": series_name, "teams": teams})
+        if teams:  # Only add series that have teams
+            final_processed_data["series"].append({"name": series_name, "teams": teams})
         
     # Save the combined processed results
     try:
@@ -340,13 +621,13 @@ Please provide the structured JSON containing only the next future match for {te
     except Exception as e:
         print(f"Error saving processed agent results: {e}")
         
-    # Optional: Save raw search results if needed
+    # Optional: Save raw search results
     try:
-        with open(raw_results_file, 'w', encoding='utf-8') as f:
-            json.dump(all_search_results_for_debug, f, indent=2, ensure_ascii=False)
-        print(f"Raw search results saved to {raw_results_file}")
+        with open(watch_results_file, 'w', encoding='utf-8') as f:
+            json.dump(all_watch_results, f, indent=2, ensure_ascii=False)
+        print(f"Raw watch results saved to {watch_results_file}")
     except Exception as e:
-        print(f"Error saving raw search results: {e}")
+        print(f"Error saving raw watch results: {e}")
 
     # Print summary
     print(f"Results summary:")
@@ -361,24 +642,32 @@ Please provide the structured JSON containing only the next future match for {te
     print("-" * 20)
     print(f"Task completed at {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
+    return final_processed_data
 
-# --- Scheduling ---
 
-# print("Setting up schedule...")
-# Schedule the task at 02:00 and 10:00 local time
-# schedule.every().day.at("02:00").do(run_agent_task)
-# schedule.every().day.at("10:00").do(fetch_and_process_all_teams_matches)
+# --- Combined Two-Step Process ---
 
-# print("Scheduler started. Waiting for scheduled times (02:00 and 10:00)...")
-print(f"Current time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+def fetch_and_process_football_matches():
+    """
+    Main function implementing the two-step approach:
+    1. Find the next match for each team
+    2. Find where to watch each match
+    """
+    print(f"Starting two-step football match search at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Step 1: Find next matches for each team
+    next_matches = find_next_matches()
+    
+    # Step 2: Find where to watch each match
+    if next_matches:
+        final_results = find_where_to_watch(next_matches)
+        return final_results
+    else:
+        print("No next matches found. Process stopped after step 1.")
+        return None
+
 
 # --- Main Loop ---
 if __name__ == "__main__":
-    print("Running initial task immediately for testing...")
-    fetch_and_process_all_teams_matches()
-    # print("Initial task finished. Starting scheduler loop...")
-
-    # while True:
-    #   schedule.run_pending()
-    #   time.sleep(60)  # Check every minute
-
+    print("Running two-step match search process...")
+    fetch_and_process_football_matches()
