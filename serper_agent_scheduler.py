@@ -671,3 +671,4 @@ def fetch_and_process_football_matches():
 if __name__ == "__main__":
     print("Running two-step match search process...")
     fetch_and_process_football_matches()
+    

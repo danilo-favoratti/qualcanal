@@ -456,7 +456,7 @@
                     const month = months[date.getMonth()];
                     const hours = date.getHours();
                     const minutes = date.getMinutes().toString().padStart(2, '0');
-                    return `${weekday} - ${day}/${month} - ${hours}:${minutes}h`;
+                    return `${weekday} - ${day}/${month}`;
                 } catch (e) {
                     console.error(`Error formatting date: ${dateString}`, e);
                     return dateString || 'Data inválida';
@@ -638,7 +638,7 @@
 
             // --- Fetch and Render Logic ---
             function renderData(data) {
-                 updatedAtElement.textContent = `Atualizado em: ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
+                 updatedAtElement.textContent = `Atualizado em: ${new Date().toLocaleDateString('pt-BR', { dateStyle: 'short' })}`;
                  app.innerHTML = ''; 
                  
                  if (!data || !data.series || !Array.isArray(data.series)) { // Allow empty series array
