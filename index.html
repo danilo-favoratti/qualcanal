@@ -3,8 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Qual Canal?</title>
-    
+    <title>Qual Canal? Veja Onde Assistir Jogos de Futebol Ao Vivo</title>
+
+    <link rel="icon" href="images/favicon.png" type="image/x-icon">
+    <meta name="description" content="Descubra onde assistir aos próximos jogos do seu time favorito. Informações atualizadas sobre canais de transmissão.">
+    <link rel="canonical" href="https://qualcanal.com.br/">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Qual Canal? - Acompanhe os Jogos de Futebol">
+    <meta property="og:description" content="Descubra onde assistir aos próximos jogos do seu time favorito. Informações atualizadas sobre canais de transmissão.">
+    <meta property="og:image" content="https://qualcanal.com.br/og-image.png">
+    <meta property="og:url" content="https://qualcanal.com.br/">
+    <meta property="og:type" content="website">
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,6 +57,16 @@
             color: var(--text-color);
             line-height: 1.6;
             padding: 2rem;
+        }
+
+        h1 { /* Added for the main title */
+            font-family: var(--font-pixel);
+            text-align: center;
+            color: #FFD600; /* Changed to yellow */
+            font-size: 2.5rem; /* Adjust as needed */
+            margin-bottom: 2rem;
+            text-shadow: 0 2px 8px rgba(255,214,0,0.18); /* Changed to gold shadow */
+            line-height: 1.2; /* Added for better line spacing */
         }
 
         main {
@@ -312,6 +333,7 @@
 
         .list-continuation {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             margin: 3rem 0 0 0;
@@ -321,13 +343,15 @@
             color: #FFD600;
             text-align: center;
             line-height: 1.1;
+            font-family: var(--font-pixel);
+            text-shadow: 0 2px 8px rgba(255,214,0,0.18);
+            gap: 1rem;
         }
         .list-continuation-link {
             color: #FFD600;
             text-decoration: underline;
             font-size: 2.1rem;
             font-weight: 900;
-            margin-left: 0.4em;
             transition: color 0.2s;
         }
         .list-continuation-link:hover {
@@ -424,7 +448,7 @@
     </style>
 </head>
 <body>
-
+    <h1>Veja Onde Assistir<br>o Jogo do seu Time</h1>
     <main id="app">
         <div class="loading">
              <div class="spinner"></div>
@@ -469,13 +493,79 @@
                 link.className = 'channel-link';
                 link.textContent = channel.name;
                 link.href = channel.url || '#';
-                if (channel.url && channel.url !== '#') { // Only add target blank for valid URLs
+                if (channel.url && channel.url !== '#') {
                     link.target = '_blank';
                     link.rel = 'noopener noreferrer';
                 }
                 return link;
             }
             
+            function createSportsEventSchema(team, match) {
+                if (!team || !match || !match.adversary || !match.datetime_brt) {
+                    return null;
+                }
+
+                const siteUrl = "https://qualcanal.com.br/";
+                const baseUri = document.baseURI;
+
+                const schema = {
+                    "@context": "https://schema.org",
+                    "@type": "SportsEvent",
+                    "name": `Jogo: ${team.name} vs ${match.adversary}`,
+                    "homeTeam": {
+                        "@type": "SportsTeam",
+                        "name": team.name
+                    },
+                    "awayTeam": {
+                        "@type": "SportsTeam",
+                        "name": match.adversary
+                    },
+                    "startDate": new Date(match.datetime_brt).toISOString(),
+                    "eventStatus": "https://schema.org/EventScheduled",
+                    "description": `Acompanhe o jogo entre ${team.name} e ${match.adversary}. Veja os canais de transmissão em ${siteUrl}.`,
+                    "url": siteUrl,
+                    "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+                    "location": {
+                         "@type": "VirtualLocation",
+                         "url": siteUrl
+                    },
+                    "organizer": [
+                        { "@type": "SportsTeam", "name": team.name },
+                        { "@type": "SportsTeam", "name": match.adversary }
+                    ]
+                };
+
+                if (team.image && team.image !== 'images/default.png') {
+                    const absoluteImageURL = new URL(team.image, baseUri).href;
+                    schema.homeTeam.logo = absoluteImageURL;
+                    schema.image = absoluteImageURL;
+                } else {
+                    schema.image = new URL('og-image.png', siteUrl).href; // Assuming og-image.png is at root
+                }
+
+                if (match.channels && match.channels.length > 0) {
+                    const potentialActions = match.channels
+                        .filter(channel => channel && channel.name && channel.url && channel.url !== '#')
+                        .map(channel => ({
+                            "@type": "WatchAction",
+                            "target": {
+                                "@type": "EntryPoint",
+                                "urlTemplate": channel.url,
+                                "name": channel.name,
+                                "actionPlatform": [
+                                    "http://schema.org/DesktopWebPlatform",
+                                    "http://schema.org/MobileWebPlatform"
+                                ]
+                            },
+                            "name": `Assistir em ${channel.name}`
+                        }));
+                    if (potentialActions.length > 0) {
+                         schema.potentialAction = potentialActions;
+                    }
+                }
+                return schema;
+            }
+
             function createSearchButton(teamName, opponent = null) {
                 const container = document.createElement('div');
                 container.className = 'fallback-container';
@@ -514,7 +604,6 @@
                 localStorage.setItem('futstream_favorites', JSON.stringify(favs));
             }
 
-            // --- Create Team Item Function (New Structure) ---
             function createTeamItem(team, isFavorited, onToggleFavorite) { 
                  if (!team || !team.name) {
                      console.warn('Skipping invalid team object:', team);
@@ -524,7 +613,6 @@
                 const teamItem = document.createElement('div');
                 teamItem.className = 'team-item' + (isFavorited ? ' favorited' : '');
 
-                // Favorite Button
                 const favBtn = document.createElement('button');
                 favBtn.className = 'favorite-btn' + (isFavorited ? ' favorited' : '');
                 favBtn.title = isFavorited ? 'Remover dos favoritos' : 'Favoritar';
@@ -540,7 +628,6 @@
                 };
                 teamItem.appendChild(favBtn);
 
-                // Team Header
                 const teamHeader = document.createElement('div');
                 teamHeader.className = 'team-header';
                 
@@ -561,22 +648,27 @@
                 teamHeader.appendChild(teamNameElement);
                 teamItem.appendChild(teamHeader);
 
-                // Match Details Container
                 const matchDetailsContainer = document.createElement('div');
                 matchDetailsContainer.className = 'match-details';
 
                 if (team.error) {
-                    // Instead of just showing an error, add a search button
                     const searchContainer = createSearchButton(team.name);
                     matchDetailsContainer.appendChild(searchContainer);
                 } else if (team.matches && Array.isArray(team.matches) && team.matches.length > 0) {
                     const match = team.matches[0]; 
                     if (!match || !match.adversary || !match.datetime_brt) {
-                         // Add search button for missing match data
                          const searchContainer = createSearchButton(team.name);
                          matchDetailsContainer.appendChild(searchContainer);
                     } else {
-                        // Opponent and Date
+                        const sportsEventSchema = createSportsEventSchema(team, match);
+                        if (sportsEventSchema) {
+                            const script = document.createElement('script');
+                            script.type = 'application/ld+json';
+                            script.textContent = JSON.stringify(sportsEventSchema, null, 2); // null, 2 for pretty print
+                            script.classList.add('sports-event-schema');
+                            document.head.appendChild(script);
+                        }
+
                         const opponentDateDiv = document.createElement('div');
                         opponentDateDiv.className = 'match-opponent-date';
                         
@@ -592,7 +684,6 @@
                         opponentDateDiv.appendChild(matchDatetime);
                         matchDetailsContainer.appendChild(opponentDateDiv);
 
-                        // Channels Section
                         const channelsSection = document.createElement('div');
                         channelsSection.className = 'channels-section';
 
@@ -621,13 +712,11 @@
                             channelsSection.appendChild(channelsList);
                             matchDetailsContainer.appendChild(channelsSection);
                         } else {
-                             // Add search button for missing channels with opponent info
                              const searchContainer = createSearchButton(team.name, match.adversary);
                              matchDetailsContainer.appendChild(searchContainer);
                         }
                     }
                 } else {
-                    // Add search button for no matches
                     const searchContainer = createSearchButton(team.name);
                     matchDetailsContainer.appendChild(searchContainer);
                 }
@@ -636,12 +725,13 @@
                 return teamItem;
             }
 
-            // --- Fetch and Render Logic ---
             function renderData(data) {
                  updatedAtElement.textContent = `Atualizado em: ${new Date().toLocaleDateString('pt-BR', { dateStyle: 'short' })}`;
                  app.innerHTML = ''; 
                  
-                 if (!data || !data.series || !Array.isArray(data.series)) { // Allow empty series array
+                 document.querySelectorAll('script.sports-event-schema').forEach(s => s.remove());
+
+                 if (!data || !data.series || !Array.isArray(data.series)) {
                      throw new Error('Formato de dados inválido');
                  }
 
@@ -657,9 +747,8 @@
                     return;
                  }
 
-                 // FAVORITES
                  let favorites = getFavorites();
-                 // Sort: favorites first, then alphabetically
+
                  allTeams.sort((a, b) => {
                      const aFav = favorites.includes(a.name);
                      const bFav = favorites.includes(b.name);
@@ -692,14 +781,24 @@
                  
                  app.appendChild(teamsGrid); 
 
-                 // After rendering the grid, add the list continuation link
                  const continuation = document.createElement('div');
                  continuation.className = 'list-continuation';
-                 continuation.innerHTML = `Não encontrou seu time? <a class="list-continuation-link" href="https://favoratti.com/onde-assistir/" target="_blank" rel="noopener">Clique aqui</a>`;
+                 
+                 const text = document.createElement('div');
+                 text.textContent = 'Não encontrou seu time?';
+                 
+                 const link = document.createElement('a');
+                 link.className = 'list-continuation-link';
+                 link.href = 'https://favoratti.com/onde-assistir/';
+                 link.target = '_blank';
+                 link.rel = 'noopener';
+                 link.textContent = 'Clique aqui';
+                 
+                 continuation.appendChild(text);
+                 continuation.appendChild(link);
                  app.appendChild(continuation);
             }
 
-            // Initial Fetch
             fetch('match_results.json?cacheBust=' + new Date().getTime()) 
                 .then(response => {
                     if (!response.ok) {
